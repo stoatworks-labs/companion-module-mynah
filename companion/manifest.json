@@ -5,7 +5,7 @@
   "name": "mynah",
   "shortname": "Mynah",
   "description": "Drive an Analog Way LivePremier (Aquilon) with lighting-desk command syntax \u2014 recall, store, label and delete screen, master and layer memories, and take, all from one command field. Verified on a physical Aquilon C. Not affiliated with Analog Way.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "repository": "git+https://github.com/stoatworks-labs/companion-module-mynah.git",
   "bugs": "https://github.com/stoatworks-labs/companion-module-mynah/issues",
@@ -22,7 +22,7 @@
     "entrypoint": "../src/main.js"
   },
   "legacyIds": [],
-  "manufacturer": "Analog Way (compatible)",
+  "manufacturer": "Mynah (Analog Way compatible)",
   "products": [
     "LivePremier",
     "Aquilon RS1",
@@ -34,6 +34,7 @@
     "Alta 4K"
   ],
   "keywords": [
+    "mynah",
     "analog way",
     "livepremier",
     "aquilon",
@@ -41,6 +42,9 @@
     "video",
     "switcher",
     "presentation",
-    "memories"
+    "memories",
+    "command line",
+    "syntax",
+    "lighting desk"
   ]
 }
