@@ -58,12 +58,12 @@ export default function UpdateActions(self) {
             "Verb first. Thru / + / - build ranges. If masks a Store Master.",
         },
       ],
-      callback: async (event, context) => {
-        const command = await context.parseVariablesInString(
-          event.options.command ?? "",
-        );
-        run(self, command);
-      },
+      // The option arrives already resolved. `parseVariablesInString` does not
+      // exist on the callback context in base 2.x — Companion expands variables
+      // itself before invoking the callback, and calling it throws at press
+      // time while the module still loads and every other action works.
+      callback: (event) => run(self, event.options.command ?? ""),
+
     },
 
     recall_memory: {
