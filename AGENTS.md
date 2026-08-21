@@ -74,13 +74,13 @@ planner emits was verified on a physical Aquilon C on firmware 6.2.73 — see
 `docs/PATHS.md` in the mynah repo — but **no button has been pressed on real
 hardware**. Say so in any release note.
 
-## No CI, deliberately
+## CI
 
-There is no `.github/` here. Actions minutes are billed on private repositories,
-and the same call was made for the other private repo in this family. The copied
-workflow would also have failed as-is: it ran `node test/smoke.mjs` with no
-`npm install`, which suited openrcs's dependency-free protocol test but not this
-one, which loads the real `@companion-module/base`.
+`test.yml` runs `npm ci`, the smoke suite and `npm run package` — the install is
+required here, unlike openrcs's dependency-free protocol test, because these
+tests load the real `@companion-module/base`. Packaging is a separate step on
+purpose: a module can pass every unit test and still fail to build.
 
-If this ever goes public, add the fleet workflows back and put an `npm ci` step
-before the test.
+Neither catches an action that throws only when pressed. That class of bug —
+see the `parseVariablesInString` entry in the traps list — is why the suite also
+greps its own source for known-dead APIs.
