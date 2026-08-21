@@ -4,16 +4,21 @@
   "id": "mynah",
   "name": "mynah",
   "shortname": "Mynah",
-  "description": "Drive an Analog Way LivePremier (Aquilon) with lighting-desk command syntax — recall, store, label and delete screen, master and layer memories, and take, all from one command field. Verified on a physical Aquilon C. Not affiliated with Analog Way.",
+  "description": "Drive an Analog Way LivePremier (Aquilon) with lighting-desk command syntax \u2014 recall, store, label and delete screen, master and layer memories, and take, all from one command field. Verified on a physical Aquilon C. Not affiliated with Analog Way.",
   "version": "1.0.0",
   "license": "MIT",
   "repository": "git+https://github.com/stoatworks-labs/companion-module-mynah.git",
   "bugs": "https://github.com/stoatworks-labs/companion-module-mynah/issues",
-  "maintainers": [{ "name": "Allan Sargeant", "email": "" }],
+  "maintainers": [
+    {
+      "name": "Allan Sargeant",
+      "email": ""
+    }
+  ],
   "runtime": {
     "type": "node22",
     "api": "nodejs-ipc",
-    "apiVersion": "0.0.0",
+    "apiVersion": "2.1.3",
     "entrypoint": "../src/main.js"
   },
   "legacyIds": [],
