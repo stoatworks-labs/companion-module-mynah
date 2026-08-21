@@ -4,8 +4,8 @@ import { InstanceStatus } from "@companion-module/base";
 /**
  * The Web RCS WebSocket — the socket the vendor's own browser UI speaks.
  *
- * Undocumented, recovered from the Web RCS bundle and verified on a physical
- * Aquilon C (firmware 6.2.73). It is used in preference to the documented AWJ
+ * Undocumented by the vendor, and verified on a physical Aquilon C (firmware
+ * 6.2.73). It is used in preference to the documented AWJ
  * protocol on TCP 10606 because AWJ is capped at five concurrent clients, its
  * subscriptions are empty until a client writes a subscription list, and it
  * cannot enumerate anything. This socket pushes state unsolicited from the
