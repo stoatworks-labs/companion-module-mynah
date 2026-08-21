@@ -1,0 +1,8 @@
+node_modules
+*.tgz
+pkg/
+.DS_Store
+
+# Build output from `npm run package`
+pkg/
+*.tgz

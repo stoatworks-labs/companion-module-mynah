@@ -1,0 +1,7 @@
+# Generated, not written. Reformatting it makes `npm run sync:lang` produce a
+# spurious diff every time and defeats the point of vendoring a bundle.
+src/lang.js
+
+node_modules
+pkg
+*.tgz
