@@ -15,6 +15,20 @@ One action takes any Mynah command, so a button says what it does in words
 rather than hiding behind a numeric opcode. There are discrete actions too, for
 people who would rather pick from dropdowns.
 
+<!-- downloads:start -->
+
+## Download
+
+**[v1.0.3](https://github.com/stoatworks-labs/companion-module-mynah/releases/tag/v1.0.3)**
+
+This release contains:
+
+- [`mynah-1.0.3.tgz`](https://github.com/stoatworks-labs/companion-module-mynah/releases/download/v1.0.3/mynah-1.0.3.tgz) — npm package, 27 KB
+
+All builds, checksums and release notes: [github.com/stoatworks-labs/companion-module-mynah/releases](https://github.com/stoatworks-labs/companion-module-mynah/releases).
+
+<!-- downloads:end -->
+
 ## Why this and not the Stream Deck plugin
 
 Mynah also ships an Elgato Stream Deck plugin, and this supersedes it for
@@ -39,11 +53,37 @@ The preset library is the point. Drag from Companion's preset panel:
 | Layer memories  | Screens 1–2, layer 1, memories 1–8                          |
 | Indicators      | Which screens are selected in the vendor Web RCS            |
 | Store           | Screens 1–4 × memories 1–4, deliberately a different colour |
+| Command builder | The slot keys and controls for building a command by hand   |
+| Macros          | Twenty-four slots for commands the builder has parked       |
 | Status          | Connection, and the last command's result                   |
 
 That is a bit over a hundred ready-made buttons — enough to fill pages without
 typing a command by hand. For anything past those ranges, drop a **Command**
 button on a key and type it.
+
+## The command builder
+
+Build a whole command out of key presses — no typing, no configuration dialog.
+
+Press a key and the slots offer the verbs; press `Recall` and they offer
+Screen, Aux, Master, Multiviewer; press `Screen` and they list the screens,
+with a `123…` key to the keypad for anything longer or for a range. **Fire**
+lights the moment what you have built compiles, and **Save** parks it on one of
+twenty-four macro keys that label themselves.
+
+A Companion module cannot make a surface change page — so the page does not
+change, the faces do. Each slot key reads its text from a variable the module
+rewrites on every press. Drag the slot presets onto a page in order, add Back,
+Home, More, Fire and Save, and tell the connection how many slots you laid out.
+
+The keypad carries `Thru`, `+` and `-` wherever a range parses, so
+`Take Screen 1 Thru 4 - 3` is a handful of presses. It does not offer them on a
+memory number, where the grammar takes a single slot.
+
+`Set` — live layer control — is not in the builder: the compiler refuses it
+without live buffer state this module does not track. `Label` is not there
+either, because it needs a quoted string and a control surface has no text
+entry. See [docs/BUILDER.md](docs/BUILDER.md).
 
 ## Connecting
 
