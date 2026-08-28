@@ -1,4 +1,8 @@
-> Built with AI assistance ([Claude Code](https://claude.com/claude-code)).
+> **AI-assisted project.** This codebase was created with [Claude Code](https://claude.com/claude-code).
+> The command planner is the same code verified against a physical **Aquilon C** on firmware
+> 6.2.73, and the module surface is exercised against the real `@companion-module/base`. But
+> **this module has never been loaded into a running Companion**, and no button on a Stream Deck
+> has ever been pressed to fire one of its presets. See [Status](#status).
 
 # companion-module-mynah
 
