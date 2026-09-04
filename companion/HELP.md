@@ -56,6 +56,33 @@ explicit `Program` or a `Take`.
 Unlike the Mynah web tool, a button has no sticky selection. Every command must
 name its own screen. `Select` and `Clear` are refused for that reason.
 
+### The command builder
+
+Build a command out of key presses instead of typing one.
+
+Drag the **Command builder** presets onto a page: the numbered slot keys in
+order, then Back, Home, More, Fire and Save. Tell the connection how many slot
+keys you laid out — a module is never told how big a surface is.
+
+Press a slot and the faces change to the next set of choices: the verbs, then
+what to act on, then a list of screens with a `123…` key to the keypad for
+anything longer or for a range. The page never changes; the keys relabel
+themselves. **Fire** lights as soon as what you have built compiles, which is
+often before the last question is answered — `Take Screen 1` is finished the
+moment the screen lands, and the offer of Preview or Program is just an offer.
+
+The keypad carries `Thru`, `+` and `-` wherever the grammar takes a range, and
+hides them where it does not. **Back** is an undo, one press at a time.
+
+**Save** asks which of the twenty-four macro slots to park the line on. Macros
+live in the connection's own config, so they survive a restart and travel with
+a Companion configuration export; each macro key labels itself.
+
+`Set` and `Label` are not in the builder. `Label` needs a quoted string, and a
+control surface has no text entry. `Set` — live layer control — needs the
+device's current buffer state, which this module does not track; the compiler
+would refuse every one, so the builder does not offer them.
+
 ### Feedbacks
 
 - **Memory is loaded on a screen** — the memory sits in one of that screen's
@@ -63,3 +90,9 @@ name its own screen. `Select` and `Clear` are refused for that reason.
   reports buffers as A/B/C, and which one is preview differs between screens.
 - **Connected to the device**
 - **Screen is selected in the vendor Web RCS**
+- **Builder: what a slot is showing** — colours a slot key by what it currently
+  holds. The slot presets ship with one per kind, so an empty slot goes dark
+  and a Delete goes red without configuring anything.
+- **Builder: the line would fire**
+- **Builder: the list has more pages**
+- **Macro: the slot holds a command**

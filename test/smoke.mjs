@@ -14,6 +14,7 @@
 import assert from "node:assert/strict";
 
 import { plan, buildCommand, keyTitle } from "../src/commands.js";
+import { refreshVariables } from "../src/variables.js";
 
 let passed = 0;
 const check = (name, fn) => {
@@ -204,7 +205,7 @@ check("everything buildCommand produces actually compiles", () => {
 });
 
 check("keyTitle stays short and flags a bad command", () => {
-  assert.equal(keyTitle("Recall Screen 1 Memory 5"), "Recall\\nS1\\nM5");
+  assert.equal(keyTitle("Recall Screen 1 Memory 5"), "Recall\nS1\nM5");
   assert.equal(keyTitle("Recall Screen 99 Memory 1"), "⚠︎");
 });
 
@@ -235,7 +236,11 @@ function harness() {
     value: "aquilon-1",
     configurable: true,
   });
-  self.config = { host: "", port: 80 };
+  self.config = { host: "", port: 80, builderSlots: 12, macros: "" };
+  self.saveConfig = (c) => (recorded.savedConfig = c);
+  // init() calls this before rebuild(); the harness has to as well, or the
+  // fixture is a shape the module never actually runs in.
+  self.loadBuilderConfig.call(self);
   self.setActionDefinitions = (v) => (recorded.actions = v);
   self.setFeedbackDefinitions = (v) => (recorded.feedbacks = v);
   self.setVariableDefinitions = (v) => {
@@ -467,5 +472,433 @@ check(
     );
   },
 );
+
+// --- the parseVariablesInString trap ----------------------------------------
+// `parseVariablesInString` and `parseVariablesInField` were removed from
+// @companion-module/base 2.x. Neither is on the callback context, on
+// InstanceBase, or anywhere in the package. Companion expands a `useVariables`
+// option itself before invoking the callback, so the option arrives already
+// resolved: the call is redundant as well as fatal, throwing "... is not a
+// function" the moment that one action or feedback fires. Nothing else catches
+// it — the module loads, init() succeeds, every definition registers, and every
+// path that does not make the call keeps working, so the suite passes with the
+// bug live. This fixture no longer stubs either function, so a reintroduced
+// call now throws here too; the grep is the backstop for a path the fixture
+// never exercises. It matches the call form only, so prose naming the
+// functions stays legal.
+const { readdirSync: pvReadDir, readFileSync: pvReadFile } =
+  await import("node:fs");
+const pvOffenders = () => {
+  const dir = new URL("../src/", import.meta.url).pathname;
+  const bad = [];
+  for (const f of pvReadDir(dir)) {
+    if (!/\.(js|ts)$/.test(f)) continue;
+    if (/parseVariablesIn(String|Field)\s*\(/.test(pvReadFile(dir + f, "utf8")))
+      bad.push(f);
+  }
+  return bad;
+};
+
+check("no parseVariablesInString/Field call survives in src/", () => {
+  assert.deepEqual(
+    pvOffenders(),
+    [],
+    "read the already-resolved event.options value instead",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// The command builder
+// ---------------------------------------------------------------------------
+
+const { Builder } = await import("../src/builder.js");
+const { STEPS, MACRO_SLOTS: MENU_MACRO_SLOTS } = await import("../src/menu.js");
+const { readMacros, writeMacros, setMacro } = await import("../src/macros.js");
+
+/**
+ * The drift guard.
+ *
+ * The step graph is written down rather than derived — `completions()` is a
+ * prefix filter over the keyword list, not a next-token oracle, and the parser
+ * is a flat clause loop with no tree to walk out of. So the guard is this: walk
+ * every path the graph can emit and hand each finished line to `plan()`. The
+ * menu may be wrong about taste; it cannot be wrong about legality without
+ * turning this red.
+ *
+ * Loops (the `If` filter, the category chain) are bounded by visiting a step at
+ * most twice on one path, which still covers both the first and the repeat
+ * spelling of a clause — the two that differ.
+ */
+function walkMenu() {
+  const lines = [];
+  const bad = [];
+  const missing = new Set();
+
+  const walk = (stepId, tokens, seen) => {
+    if (stepId === "end") {
+      const line = tokens.join(" ");
+      lines.push(line);
+      const p = plan(line);
+      if (!p.ok) bad.push(`${line} — ${p.error}`);
+      return;
+    }
+    const step = STEPS[stepId];
+    if (!step) {
+      missing.add(stepId);
+      return;
+    }
+    // Macro steps read saved state rather than emitting words; there is
+    // nothing to compile.
+    if (step.kind === "macro") return;
+
+    const visits = (seen.get(stepId) ?? 0) + 1;
+    if (visits > 2) return;
+    const next = new Map(seen);
+    next.set(stepId, visits);
+
+    if (step.kind === "number") {
+      const samples = [];
+      for (const q of (step.quick ?? []).slice(0, 2)) samples.push(q.text);
+      samples.push(String(step.min), String(step.max));
+      if (step.range && step.max > step.min + 2)
+        samples.push(
+          `${step.min} Thru ${step.min + 2}`,
+          `${step.min} Thru ${step.min + 2} - ${step.min + 1}`,
+        );
+      for (const v of samples)
+        walk(step.next, [...tokens, ...v.split(" ")], next);
+      return;
+    }
+
+    for (const c of step.choices ?? []) {
+      if (c.act) continue; // fire / save / home do not add words
+      walk(c.next, c.text ? [...tokens, ...c.text.split(" ")] : tokens, next);
+    }
+  };
+
+  walk("verb", [], new Map());
+  return { lines, bad, missing: [...missing] };
+}
+
+const walked = walkMenu();
+
+check("every step the menu points at exists", () => {
+  assert.deepEqual(walked.missing, []);
+});
+
+check("every command the builder can produce compiles", () => {
+  assert.deepEqual(
+    walked.bad.slice(0, 5),
+    [],
+    `${walked.bad.length} of ${walked.lines.length} paths do not compile`,
+  );
+  assert.ok(
+    walked.lines.length > 1000,
+    `expected the graph to reach thousands of commands, got ${walked.lines.length}`,
+  );
+});
+
+check("the builder reaches every verb the module will accept", () => {
+  for (const verb of ["Recall", "Store", "Take", "Delete"])
+    assert.ok(
+      walked.lines.some((l) => l.startsWith(verb)),
+      `no path builds a ${verb}`,
+    );
+  // Label needs a quoted string and there is no text entry on a surface; Set
+  // needs live buffer state this module does not track; Select and Clear are
+  // refused by plan(). None of them may appear.
+  for (const verb of ["Label", "Set", "Select", "Clear"])
+    assert.ok(
+      !walked.lines.some((l) => l.startsWith(verb)),
+      `${verb} is in the menu but cannot work from a surface`,
+    );
+});
+
+check("a masked master store is reachable, which is the point", () => {
+  assert.ok(
+    walked.lines.some((l) => /^Store Master \d+ If .*Category /.test(l)),
+    "the If filter is the most tedious command to type and must be buildable",
+  );
+});
+
+/** Press slots by their visible label, which is how an operator does it. */
+function pressLabel(b, label) {
+  const i = b.view().findIndex((s) => s.label === label);
+  assert.ok(
+    i >= 0,
+    `no slot labelled ${JSON.stringify(label)} — have ${b
+      .view()
+      .map((s) => s.label)
+      .join("|")}`,
+  );
+  return b.press(i + 1);
+}
+
+check("a command can be built entirely out of presses", () => {
+  const b = new Builder(12);
+  pressLabel(b, "Recall");
+  pressLabel(b, "Screen");
+  pressLabel(b, "3");
+  pressLabel(b, "Memory");
+  pressLabel(b, "5");
+  assert.equal(b.line, "Recall Screen 3 Memory 5");
+  assert.ok(b.valid);
+});
+
+check("fire lights before the menu has finished asking", () => {
+  // The grammar takes its clauses in any order, so a rigid wizard would be
+  // asking for presses the device does not need.
+  const b = new Builder(12);
+  pressLabel(b, "Take");
+  pressLabel(b, "Screen");
+  assert.ok(!b.valid, "a verb and an object alone is not a command");
+  pressLabel(b, "1");
+  assert.ok(b.valid, "Take Screen 1 is complete the moment the screen lands");
+  assert.equal(b.line, "Take Screen 1");
+});
+
+check("the keypad accumulates digits rather than separate numbers", () => {
+  const b = new Builder(12);
+  pressLabel(b, "Recall");
+  pressLabel(b, "Screen");
+  pressLabel(b, "123…");
+  pressLabel(b, "2");
+  pressLabel(b, "4");
+  pressLabel(b, "⏎");
+  assert.equal(b.line, "Recall Screen 24", "24, not 2 then 4");
+});
+
+check("a range can be typed where the grammar takes one", () => {
+  const b = new Builder(15);
+  pressLabel(b, "Take");
+  pressLabel(b, "Screen");
+  pressLabel(b, "123…");
+  pressLabel(b, "1");
+  pressLabel(b, "Thru");
+  pressLabel(b, "4");
+  pressLabel(b, "−");
+  pressLabel(b, "3");
+  pressLabel(b, "⏎");
+  assert.equal(b.line, "Take Screen 1 Thru 4 - 3");
+  assert.ok(b.valid);
+});
+
+check("the range operators are hidden where a range will not parse", () => {
+  // `Recall Screen 1 Thru 4 Memory 2` is four recalls of one memory, but
+  // `Memory 1 Thru 3` does not parse at all. Offering the key would build a
+  // command the grammar refuses.
+  const b = new Builder(32);
+  pressLabel(b, "Recall");
+  pressLabel(b, "Screen");
+  pressLabel(b, "1");
+  pressLabel(b, "Memory");
+  pressLabel(b, "123…");
+  const labels = b.view().map((s) => s.label);
+  assert.ok(labels.includes("⏎"), "the keypad should still be here");
+  for (const op of ["Thru", "+", "−"])
+    assert.ok(!labels.includes(op), `${op} must not be offered on a memory`);
+});
+
+check("enter is refused on an unfinished expression", () => {
+  const b = new Builder(15);
+  pressLabel(b, "Take");
+  pressLabel(b, "Screen");
+  pressLabel(b, "123…");
+  pressLabel(b, "1");
+  pressLabel(b, "+");
+  pressLabel(b, "⏎");
+  assert.equal(b.line, "Take Screen", "a trailing + must not commit");
+  // A trailing Thru is the exception: `1 Thru` is open-ended.
+  const c = new Builder(15);
+  pressLabel(c, "Take");
+  pressLabel(c, "Screen");
+  pressLabel(c, "123…");
+  pressLabel(c, "1");
+  pressLabel(c, "Thru");
+  pressLabel(c, "⏎");
+  assert.equal(c.line, "Take Screen 1 Thru");
+  assert.ok(c.valid, "an open-ended range is a real command");
+});
+
+check("back is an undo, one press at a time", () => {
+  const b = new Builder(12);
+  pressLabel(b, "Recall");
+  pressLabel(b, "Screen");
+  pressLabel(b, "3");
+  b.back();
+  assert.equal(b.line, "Recall Screen");
+  b.back();
+  assert.equal(b.line, "Recall");
+  b.back();
+  assert.equal(b.line, "");
+  b.back(); // past the start is a no-op, not a crash
+  assert.equal(b.line, "");
+});
+
+check("the view is always exactly as long as the surface", () => {
+  for (const n of [4, 6, 12, 15, 32]) {
+    const b = new Builder(n);
+    assert.equal(b.view().length, n);
+    pressLabel(b, "Recall");
+    assert.equal(b.view().length, n, "a short list must still blank the rest");
+    assert.ok(
+      b.view().every((s) => typeof s.label === "string"),
+      "a slot with nothing in it keeps the last step's label unless blanked",
+    );
+  }
+});
+
+check("a long list pages, and the keypad key survives every page", () => {
+  const b = new Builder(6);
+  pressLabel(b, "Recall");
+  pressLabel(b, "Screen"); // 24 screens over five slots a page
+  assert.ok(b.pageCount() > 1);
+  const seen = new Set();
+  for (let i = 0; i < b.pageCount(); i++) {
+    assert.ok(
+      b.view().some((s) => s.label === "123…"),
+      `page ${i} has no way to the keypad`,
+    );
+    for (const s of b.view()) if (s.label !== "") seen.add(s.label);
+    b.more();
+  }
+  assert.ok(seen.has("24"), "every screen should be reachable by paging");
+});
+
+check("macros survive a round trip through the config field", () => {
+  let macros = readMacros("");
+  assert.equal(macros.length, MENU_MACRO_SLOTS);
+  assert.ok(macros.every((m) => m === null));
+
+  macros = setMacro(macros, 3, "Recall Screen 1 Memory 5");
+  const raw = writeMacros(macros);
+  const back = readMacros(raw);
+  assert.equal(back[2].line, "Recall Screen 1 Memory 5");
+  assert.ok(back[2].label.includes("S1"), "a macro labels its own key");
+  assert.equal(back[0], null);
+});
+
+check("a broken macro field costs the macros, not the connection", () => {
+  // The field is hand-editable on purpose, so it is a field a human can break.
+  for (const raw of ["{", "null", "[1,2,3]", '{"line":"x"}', "[]"]) {
+    const m = readMacros(raw);
+    assert.equal(m.length, MENU_MACRO_SLOTS);
+    assert.ok(m.every((e) => e === null || typeof e.line === "string"));
+  }
+});
+
+check("saving asks which slot, and loading puts it back on the line", () => {
+  const b = new Builder(12);
+  pressLabel(b, "Recall");
+  pressLabel(b, "Screen");
+  pressLabel(b, "1");
+  pressLabel(b, "Memory");
+  pressLabel(b, "7");
+
+  const asked = b.act({ type: "save" });
+  assert.equal(asked, undefined, "a valid line goes to the slot picker");
+  assert.equal(b.stepId, "macro_save");
+
+  b.macroLabels = ["", "", ""];
+  const effect = b.press(2);
+  assert.deepEqual(effect, { saveTo: 2 });
+
+  b.loadLine("Recall Screen 1 Memory 7");
+  assert.equal(b.line, "Recall Screen 1 Memory 7");
+  assert.ok(b.valid);
+});
+
+check("save is refused with a reason when there is nothing to save", () => {
+  const b = new Builder(12);
+  pressLabel(b, "Recall");
+  const refused = b.act({ type: "save" });
+  assert.ok(refused?.refuse, "an empty save must say why, not fail silently");
+});
+
+check("an empty macro slot cannot be fired", () => {
+  const b = new Builder(12);
+  b.macroLabels = ["", "Take S1"];
+  b.stepId = "macro_run";
+  assert.equal(b.press(1), undefined, "slot 1 is empty");
+  assert.deepEqual(b.press(2), { load: 2 });
+});
+
+// --- the builder against the module surface ---------------------------------
+
+check("registers the builder and macro actions", () => {
+  for (const id of [
+    "builder_slot",
+    "builder_back",
+    "builder_home",
+    "builder_more",
+    "builder_fire",
+    "builder_save",
+    "macro_run",
+    "macro_edit",
+    "macro_store_current",
+    "macro_delete",
+  ])
+    assert.ok(recorded.actions[id], `missing action ${id}`);
+});
+
+check("a slot press repaints the faces, or the key looks dead", () => {
+  // The slot faces ARE the interface. A press that advances the state without
+  // pushing new variable values leaves the operator looking at the previous
+  // step's words on live keys, which is worse than a key that does nothing.
+  const { self: s4, recorded: r4 } = harness();
+  s4.onStateChanged = () => {
+    refreshVariables(s4);
+    s4.checkAllFeedbacks();
+  };
+  assert.equal(r4.variableValues.b1, "Recall");
+
+  r4.actions.builder_slot.callback({ options: { slot: 1 } });
+  assert.equal(s4.builder.line, "Recall");
+  assert.equal(
+    r4.variableValues.b1,
+    "Screen",
+    "the faces still show the previous step",
+  );
+  assert.ok(r4.checkedAll, "the slot colours have to be re-evaluated too");
+});
+
+check("firing an unfinished line refuses instead of writing", () => {
+  const { self: s5, recorded: r5 } = harness();
+  s5.onStateChanged = () => {};
+  r5.actions.builder_fire.callback({});
+  assert.ok(
+    s5.builder.message !== "",
+    "an empty fire must leave a reason on the line",
+  );
+});
+
+check("saving a macro writes the config back", () => {
+  const { self: s6, recorded: r6 } = harness();
+  s6.onStateChanged = () => {};
+  s6.builder.loadLine("Take Screen 2");
+  r6.actions.macro_store_current.callback({ options: { slot: 4 } });
+  assert.ok(
+    r6.savedConfig,
+    "saveConfig is the only durable store a module has",
+  );
+  assert.equal(readMacros(r6.savedConfig.macros)[3].line, "Take Screen 2");
+  assert.equal(s6.macros[3].line, "Take Screen 2");
+});
+
+check("every builder slot has a variable, a preset and a face", () => {
+  for (let n = 1; n <= 32; n++) {
+    assert.ok(recorded.variableDefs[`b${n}`], `b${n} is not defined`);
+    assert.ok(
+      recorded.presets[`builder_slot_${n}`],
+      `no preset for slot ${n} — it could never be dragged out`,
+    );
+  }
+  assert.equal(recorded.variableValues.b1, "Recall");
+  assert.equal(
+    recorded.variableValues.b32,
+    "",
+    "slots past the configured count must be blank",
+  );
+});
 
 console.log(`${passed} checks passed`);

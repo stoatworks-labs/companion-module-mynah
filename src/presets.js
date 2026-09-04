@@ -1,5 +1,7 @@
 import { combineRgb } from "@companion-module/base";
 
+import { MACRO_SLOTS } from "./macros.js";
+
 /**
  * The preset library — this is what populates a Stream Deck.
  *
@@ -33,6 +35,13 @@ const LAYER_MEMORIES = 8;
 const TAKE_SCREENS = 8;
 const STORE_MEMORIES = 4;
 
+/**
+ * Slot presets are shipped for every slot a surface could have, not for the
+ * configured count — the config field says how many were laid out, and a
+ * preset that does not exist cannot be dragged out later.
+ */
+const BUILDER_SLOTS = 32;
+
 const button = (
   name,
   text,
@@ -61,7 +70,7 @@ export default function UpdatePresets(self) {
     const id = `take_s${s}`;
     presets[id] = button(
       `Take Screen ${s}`,
-      `TAKE\\nS${s}`,
+      `TAKE\nS${s}`,
       RED,
       cmd(`Take Screen ${s}`),
     );
@@ -69,7 +78,7 @@ export default function UpdatePresets(self) {
   }
   presets.take_all = button(
     `Take Screens 1 thru ${SCREENS}`,
-    `TAKE\\n1-${SCREENS}`,
+    `TAKE\n1-${SCREENS}`,
     RED,
     cmd(`Take Screen 1 Thru ${SCREENS}`),
   );
@@ -94,7 +103,7 @@ export default function UpdatePresets(self) {
       const id = `recall_s${s}_m${m}`;
       presets[id] = button(
         `Recall memory ${m} to Screen ${s} preview`,
-        `S${s}\\nMEM ${m}`,
+        `S${s}\nMEM ${m}`,
         GREEN,
         cmd(`Recall Screen ${s} Memory ${m}`),
         [
@@ -130,7 +139,7 @@ export default function UpdatePresets(self) {
     const id = `recall_master_${m}`;
     presets[id] = button(
       `Recall master memory ${m} to preview`,
-      `MASTER\\n${m}`,
+      `MASTER\n${m}`,
       BLUE,
       cmd(`Recall Master ${m}`),
     );
@@ -154,7 +163,7 @@ export default function UpdatePresets(self) {
       const id = `recall_s${s}_l1_m${m}`;
       presets[id] = button(
         `Recall layer memory ${m} to Screen ${s} layer 1`,
-        `S${s} L1\\nMEM ${m}`,
+        `S${s} L1\nMEM ${m}`,
         combineRgb(90, 60, 130),
         cmd(`Recall Screen ${s} Layer 1 Memory ${m}`),
       );
@@ -219,7 +228,7 @@ export default function UpdatePresets(self) {
       const id = `store_s${s}_m${m}`;
       presets[id] = button(
         `Store Screen ${s} program into memory ${m}`,
-        `STORE\\nS${s} M${m}`,
+        `STORE\nS${s} M${m}`,
         combineRgb(70, 20, 20),
         cmd(`Store Screen ${s} Memory ${m}`),
       );
@@ -248,7 +257,7 @@ export default function UpdatePresets(self) {
   // second instance.
   presets.status_connected = button(
     "Connection status",
-    `MYNAH\\n$(${self.label}:connected)`,
+    `MYNAH\n$(${self.label}:connected)`,
     DARK,
     [],
     [
@@ -276,6 +285,161 @@ export default function UpdatePresets(self) {
         name: "Status",
         presets: ["status_connected", "status_last"],
       },
+    ],
+  });
+
+  // --- The command builder ------------------------------------------------
+
+  // A module cannot make a surface change page — there is no page or surface
+  // method on InstanceBase, and the internal actions offered to presets carry
+  // nothing of the sort. So the builder is one page whose FACES change: each
+  // slot key reads its text from a variable this module rewrites on every
+  // press, and its colour from a feedback saying what kind of thing it is
+  // showing. See docs/BUILDER.md.
+  const KIND_STYLES = {
+    digit: { bgcolor: combineRgb(35, 35, 40), color: WHITE },
+    operator: { bgcolor: combineRgb(120, 85, 25), color: WHITE },
+    action: { bgcolor: GREEN, color: WHITE },
+    danger: { bgcolor: RED, color: WHITE },
+    macro: { bgcolor: combineRgb(90, 60, 130), color: WHITE },
+    empty: { bgcolor: BLACK, color: BLACK },
+  };
+
+  const slotIds = [];
+  for (let n = 1; n <= BUILDER_SLOTS; n++) {
+    const id = `builder_slot_${n}`;
+    presets[id] = button(
+      `Builder slot ${n}`,
+      `$(${self.label}:b${n})`,
+      combineRgb(40, 50, 65),
+      [{ actionId: "builder_slot", options: { slot: n } }],
+      Object.entries(KIND_STYLES).map(([kind, style]) => ({
+        feedbackId: "builder_slot_kind",
+        options: { slot: n, kind },
+        style,
+      })),
+    );
+    slotIds.push(id);
+  }
+
+  presets.builder_line = button(
+    "Builder — the command so far",
+    `$(${self.label}:builder_prompt)\n$(${self.label}:builder_line)`,
+    DARK,
+    // No action. It is a display, and a key that looks pressable but does
+    // nothing is worse than one that plainly does not.
+    [],
+  );
+  presets.builder_why = button(
+    "Builder — why it will not fire",
+    `$(${self.label}:builder_error)`,
+    DARK,
+    [],
+  );
+  presets.builder_back = button(
+    "Builder — back",
+    "\u2190 BACK",
+    combineRgb(60, 60, 70),
+    [{ actionId: "builder_back", options: {} }],
+  );
+  presets.builder_home = button(
+    "Builder — start over",
+    "\u2302 HOME",
+    combineRgb(60, 60, 70),
+    [{ actionId: "builder_home", options: {} }],
+  );
+  presets.builder_more = button(
+    "Builder — more choices",
+    `MORE\n$(${self.label}:builder_page)`,
+    combineRgb(50, 50, 55),
+    [{ actionId: "builder_more", options: {} }],
+    [
+      {
+        feedbackId: "builder_has_more",
+        options: {},
+        style: { bgcolor: AMBER, color: BLACK },
+      },
+    ],
+  );
+  presets.builder_fire = button(
+    "Builder — fire",
+    "FIRE",
+    combineRgb(45, 45, 45),
+    [{ actionId: "builder_fire", options: {} }],
+    // Dark until the line compiles: an unlit Fire is the honest answer to
+    // "is this finished yet", and it lights earlier than the menu finishes
+    // asking because the grammar takes its clauses in any order.
+    [
+      {
+        feedbackId: "builder_ready",
+        options: {},
+        style: { bgcolor: GREEN, color: WHITE },
+      },
+    ],
+  );
+  presets.builder_save = button(
+    "Builder — save as macro",
+    "SAVE\nMACRO",
+    combineRgb(90, 60, 130),
+    [{ actionId: "builder_save", options: {} }],
+  );
+
+  sections.push({
+    id: "builder",
+    name: "Command builder",
+    description:
+      "Build a whole command out of key presses. Drag the slot keys onto a page in order, then Back, Home, More, Fire and Save. The slots relabel themselves as you press — the page never changes, the faces do. Set how many slots you laid out in the connection config.",
+    definitions: [
+      {
+        id: "builder_controls",
+        type: "simple",
+        name: "Controls",
+        presets: [
+          "builder_line",
+          "builder_fire",
+          "builder_save",
+          "builder_back",
+          "builder_home",
+          "builder_more",
+          "builder_why",
+        ],
+      },
+      {
+        id: "builder_slots",
+        type: "simple",
+        name: "Slots (lay these out in order)",
+        presets: slotIds,
+      },
+    ],
+  });
+
+  // --- Macros -------------------------------------------------------------
+
+  const macroIds = [];
+  for (let n = 1; n <= MACRO_SLOTS; n++) {
+    const id = `macro_${n}`;
+    presets[id] = button(
+      `Macro ${n}`,
+      `$(${self.label}:macro_${n}_label)`,
+      combineRgb(35, 30, 45),
+      [{ actionId: "macro_run", options: { slot: n } }],
+      [
+        {
+          feedbackId: "macro_present",
+          options: { slot: n },
+          style: { bgcolor: combineRgb(90, 60, 130), color: WHITE },
+        },
+      ],
+    );
+    macroIds.push(id);
+  }
+  sections.push({
+    id: "macros",
+    name: "Macros",
+    description:
+      "Commands parked by the builder's Save key. The face is the macro's own label, so an empty slot is blank and a filled one names itself. They live in the connection config, so they survive a restart and travel with a configuration export.",
+    definitions: [
+      { id: "macro_keys", type: "simple", name: "Macros", presets: macroIds },
     ],
   });
 

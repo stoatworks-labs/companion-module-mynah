@@ -175,6 +175,32 @@ var CATEGORIES = [
 	"MASK",
 	"KEYER"
 ];
+/** How many of each source family a LivePremier offers. */
+var SOURCES = {
+	live: 64,
+	still: 48,
+	screen: 24,
+	native: 8,
+	share: 32
+};
+/**
+* Layer parameter limits, in the units the device actually uses.
+*
+* Straight from the device's own attribute table. Note the asymmetry: a
+* position may be **negative** — pushing a layer off the edge of the canvas is
+* a normal thing to do, and since the anchor is the layer's centre it is
+* routine — while a size may not.
+*/
+var LAYER = {
+	/** Opacity is 0–256, not 0–100. */
+	opacityMax: 256,
+	/** Position and size are in pixels, anchored on the layer's centre. */
+	anchorDefault: "MIDDLE_CENTER",
+	positionMin: -2e6,
+	positionMax: 2e6,
+	sizeMin: 0,
+	sizeMax: 1e6
+};
 var screenKey = (n) => `S${n}`;
 var auxKey = (n) => `A${n}`;
 /** `NATIVE` is the background layer; the rest are plain numbers. */
@@ -223,6 +249,18 @@ var bankRoot = (bank) => {
 };
 var memoryLabel = (bank, slot) => bankRoot(bank).item("bank", slot).node("control").prop("label");
 var memoryDelete = (bank, slot) => bankRoot(bank).item("bank", slot).node("control").prop("xDelete");
+/**
+* Note the buffer key. These paths take `A`/`B`/`C`, and a command that says
+* "preview" has to be resolved against the current take state before it can
+* name one — see `bufferForMode`.
+*/
+var layerRoot = (t, buffer, layer) => DeviceObject.item(targetCollection(t), targetKey(t)).item("preset", buffer).item("layer", layerKey(layer));
+/** Which input a layer is showing. */
+var layerSource = (t, buffer, layer) => layerRoot(t, buffer, layer).node("source").prop("inputNum");
+/** Where a layer is and how big, in pixels, anchored on its centre. */
+var layerPosition = (t, buffer, layer, prop) => layerRoot(t, buffer, layer).node("position").prop(prop);
+/** Layer opacity, 0–256. */
+var layerOpacity = (t, buffer, layer) => layerRoot(t, buffer, layer).node("opacity").prop("opacity");
 //#endregion
 //#region src/lang/keywords.ts
 var kw = (word, kind) => ({
@@ -237,6 +275,7 @@ var KEYWORDS = [
 	kw("Label", "function"),
 	kw("Select", "function"),
 	kw("Clear", "function"),
+	kw("Set", "function"),
 	kw("Screen", "object"),
 	kw("Aux", "object"),
 	kw("Layer", "object"),
@@ -246,13 +285,17 @@ var KEYWORDS = [
 	kw("Native", "object"),
 	kw("Preview", "mode"),
 	kw("Program", "mode"),
+	kw("Source", "attribute"),
+	kw("Position", "attribute"),
+	kw("Size", "attribute"),
+	kw("Opacity", "attribute"),
+	kw("Still", "object"),
+	kw("None", "object"),
+	kw("Colour", "object"),
 	kw("If", "clause"),
 	kw("Category", "clause"),
 	kw("Thru", "operator"),
-	kw("Source", "category"),
-	kw("Position", "category"),
-	kw("Size", "category"),
-	kw("Opacity", "category"),
+	kw("At", "operator"),
 	kw("Cropping", "category"),
 	kw("Border", "category"),
 	kw("Transitions", "category"),
@@ -399,11 +442,26 @@ function lex(input) {
 		if (isDigit(c)) {
 			const start = i;
 			while (i < input.length && isDigit(input[i])) i++;
-			const text = input.slice(start, i);
+			if (input[i] === "." && isDigit(input[i + 1])) {
+				i++;
+				while (i < input.length && isDigit(input[i])) i++;
+			}
+			const digits = input.slice(start, i);
+			if (input[i] === "%") {
+				i++;
+				tokens.push({
+					kind: "percent",
+					value: Number(digits),
+					text: input.slice(start, i),
+					start,
+					end: i
+				});
+				continue;
+			}
 			tokens.push({
 				kind: "number",
-				value: Number(text),
-				text,
+				value: Number(digits),
+				text: digits,
 				start,
 				end: i
 			});
@@ -470,7 +528,15 @@ var FUNCTIONS = [
 	"Delete",
 	"Label",
 	"Select",
-	"Clear"
+	"Clear",
+	"Set"
+];
+/** Attribute keywords, which are also category names inside an `If`. */
+var ATTRIBUTES = [
+	"Source",
+	"Position",
+	"Size",
+	"Opacity"
 ];
 var Parser = class {
 	tokens;
@@ -483,9 +549,6 @@ var Parser = class {
 	}
 	peek() {
 		return this.tokens[this.pos];
-	}
-	next() {
-		return this.tokens[this.pos++];
 	}
 	atEnd() {
 		return this.pos >= this.tokens.length;
@@ -605,6 +668,16 @@ var Parser = class {
 			numbers
 		};
 	}
+	/** True if an attribute keyword appears anywhere ahead, and no function does. */
+	looksLikeAssignment() {
+		let sawAttribute = false;
+		for (const t of this.tokens.slice(this.pos)) {
+			if (t.kind !== "keyword") continue;
+			if (FUNCTIONS.includes(t.keyword.word)) return false;
+			if (ATTRIBUTES.includes(t.keyword.word)) sawAttribute = true;
+		}
+		return sawAttribute;
+	}
 	parseScopeInto(scope) {
 		if (this.eatKeyword("Screen")) {
 			const r = this.parseRange(DIMS.screen.min, DIMS.screen.max, "Screen");
@@ -632,11 +705,102 @@ var Parser = class {
 		}
 		return false;
 	}
+	/** `At` is optional noise before a value, for the desk-operator spelling. */
+	eatAt() {
+		this.eatKeyword("At");
+	}
+	parseAmount(what) {
+		this.eatAt();
+		let sign = 1;
+		if (this.peek()?.kind === "minus") {
+			this.pos++;
+			sign = -1;
+		}
+		const t = this.peek();
+		if (t?.kind === "percent") {
+			this.pos++;
+			return {
+				value: sign * t.value,
+				percent: true
+			};
+		}
+		if (t?.kind === "number") {
+			this.pos++;
+			return {
+				value: sign * t.value,
+				percent: false
+			};
+		}
+		this.error(`Expected a value for ${what} — a number of pixels, or a percentage like 50%`, t);
+	}
+	/** One or two amounts: a single value means both axes. */
+	parseAmountPair(what) {
+		const first = this.parseAmount(what);
+		if (!first) return void 0;
+		if (this.atAmount()) {
+			const second = this.parseAmount(what);
+			if (!second) return void 0;
+			return [first, second];
+		}
+		return [first];
+	}
+	/** True if what follows could begin a value. */
+	atAmount() {
+		const t = this.peek();
+		if (t?.kind === "number" || t?.kind === "percent" || t?.kind === "minus") return true;
+		if (t?.kind !== "keyword" || t.keyword.word !== "At") return false;
+		const next = this.tokens[this.pos + 1];
+		return next?.kind === "number" || next?.kind === "percent" || next?.kind === "minus";
+	}
+	parseAssignmentInto(set) {
+		if (this.eatKeyword("Source")) {
+			this.eatAt();
+			if (this.eatKeyword("None")) {
+				set.source = { family: "none" };
+				return true;
+			}
+			if (this.eatKeyword("Colour")) {
+				set.source = { family: "colour" };
+				return true;
+			}
+			const still = this.eatKeyword("Still");
+			const t = this.peek();
+			if (t?.kind !== "number") {
+				this.error("Expected a source number, or None / Colour", t);
+				return false;
+			}
+			this.pos++;
+			set.source = {
+				family: still ? "still" : "live",
+				n: t.value
+			};
+			return true;
+		}
+		if (this.eatKeyword("Size")) {
+			const a = this.parseAmountPair("Size");
+			if (!a) return false;
+			set.size = a;
+			return true;
+		}
+		if (this.eatKeyword("Position")) {
+			const a = this.parseAmountPair("Position");
+			if (!a) return false;
+			set.position = a;
+			return true;
+		}
+		if (this.eatKeyword("Opacity")) {
+			const a = this.parseAmount("Opacity");
+			if (!a) return false;
+			set.opacity = a;
+			return true;
+		}
+		return false;
+	}
 	parseCategories() {
 		const out = [];
 		for (;;) {
 			const t = this.peek();
-			if (t?.kind !== "keyword" || t.keyword.kind !== "category") {
+			if (!(t?.kind === "keyword" && (t.keyword.kind === "category" || ATTRIBUTES.includes(t.keyword.word)))) {
 				if (out.length === 0) {
 					this.error(`Expected a category — one of ${CATEGORIES.length} record-mask categories`, t);
 					return;
@@ -695,17 +859,22 @@ var Parser = class {
 		return filter;
 	}
 	parseCommand() {
-		const head = this.next();
+		const head = this.peek();
 		if (!head) {
 			this.error("Empty command");
 			return;
 		}
-		if (head.kind !== "keyword" || !FUNCTIONS.includes(head.keyword.word)) {
+		let fn;
+		if (head.kind === "keyword" && FUNCTIONS.includes(head.keyword.word)) {
+			this.pos++;
+			fn = head.keyword.word;
+		} else if (head.kind === "keyword" && this.looksLikeAssignment()) fn = "Set";
+		else {
 			this.error(`A command starts with a function — ${FUNCTIONS.join(", ")}`, head);
 			return;
 		}
-		const fn = head.keyword.word;
 		const scope = {};
+		const set = {};
 		let memory;
 		let mode;
 		let label;
@@ -751,7 +920,17 @@ var Parser = class {
 				continue;
 			}
 			if (this.parseScopeInto(scope)) continue;
+			if (this.parseAssignmentInto(set)) continue;
 			this.error(`Unexpected ${describe(t)} here`, t);
+			return;
+		}
+		const assignment = Object.keys(set).length > 0 ? set : void 0;
+		if (fn === "Set" && !assignment) {
+			this.error("Set needs something to set — Source, Size, Position or Opacity");
+			return;
+		}
+		if (fn !== "Set" && assignment) {
+			this.error(`${fn} does not take Source, Size, Position or Opacity — use Set`);
 			return;
 		}
 		return {
@@ -760,7 +939,8 @@ var Parser = class {
 			memory,
 			mode,
 			label,
-			filter
+			filter,
+			set: assignment
 		};
 	}
 };
@@ -769,6 +949,7 @@ function describe(t) {
 	switch (t.kind) {
 		case "keyword": return `keyword "${t.keyword.word}"`;
 		case "number": return `number ${t.value}`;
+		case "percent": return `${t.value}%`;
 		case "string": return "text";
 		case "plus": return "\"+\"";
 		case "minus": return "\"-\"";
@@ -968,6 +1149,29 @@ function compile(cmd, ctx = {}) {
 				summary: `Store ${cmd.memory} ← ${targets.map(describeTarget).join(", ")} from ${describeMode(mode)}`
 			};
 		}
+		case "Set": {
+			if (!cmd.set) return fail("Set needs something to set — Source, Size, Position or Opacity");
+			if (targets.length === 0) return fail("Set needs a Screen or Aux, or a sticky scope to inherit");
+			if (!layers) return fail("Set needs a Layer — these are layer parameters, not screen ones");
+			const mode = cmd.mode ?? "PREVIEW";
+			const facts = ctx.facts;
+			if (!facts) return fail("Set needs a live connection — layer parameters are addressed per buffer, which depends on the current take state");
+			const ops = [];
+			for (const t of targets) {
+				const buffer = facts.buffer(t, mode);
+				if (!buffer) return fail(`Cannot tell which buffer is ${describeMode(mode)} on ${describeTarget(t)} yet — the device has not reported its take state`);
+				const canvas = facts.canvas(t);
+				for (const l of layers) {
+					const err = assignmentOps(ops, cmd.set, t, buffer, l, canvas);
+					if (err) return fail(err);
+				}
+			}
+			return {
+				ok: true,
+				ops,
+				summary: `Set ${describeAssignment(cmd.set)} on ${targets.map(describeTarget).join(", ")} layer ${layers.join(", ")} ${describeMode(mode)}`
+			};
+		}
 		case "Delete": {
 			if (cmd.memory === void 0) return fail("Delete needs a Memory number");
 			const bank = bankOf(cmd.scope, layers);
@@ -1104,6 +1308,89 @@ function bankOf(scope, layers) {
 function checkSlot(bank, slot) {
 	const { min, max } = SLOTS[bank];
 	if (slot < min || slot > max) return `Memory ${slot} is out of range — ${bank} memories are ${min} to ${max}`;
+}
+/**
+* Turn one assignment into writes, resolving percentages against the canvas.
+*
+* Position is anchored on the layer's centre — the device's default anchor is
+* `MIDDLE_CENTER` — so "a third of the way across" means the centre sits at a
+* third of the canvas, which is what someone asking for it means.
+*/
+function assignmentOps(ops, set, t, buffer, layer, canvas) {
+	const px = (a, axis, what) => {
+		if (!a.percent) return Math.round(a.value);
+		if (!canvas) return `${what} was given as a percentage, but the canvas size of ${describeTarget(t)} is not known yet — give it in pixels, or connect and let the device report its size`;
+		return Math.round(a.value / 100 * canvas[axis]);
+	};
+	if (set.source) {
+		const value = sourceValue(set.source);
+		if (typeof value === "string" && value.startsWith("!")) return value.slice(1);
+		ops.push({
+			path: layerSource(t, buffer, layer),
+			value,
+			describe: `Source ${value} on ${describeTarget(t)} layer ${layer}`
+		});
+	}
+	if (set.size) {
+		const [hAmt, vAmt] = set.size.length === 1 ? [set.size[0], set.size[0]] : set.size;
+		const h = px(hAmt, "w", "Size");
+		if (typeof h === "string") return h;
+		const v = px(vAmt, "h", "Size");
+		if (typeof v === "string") return v;
+		for (const [axis, n] of [["Width", h], ["Height", v]]) if (n < LAYER.sizeMin || n > LAYER.sizeMax) return `${axis} ${n}px is out of range — a size must be between ${LAYER.sizeMin} and ${LAYER.sizeMax}. A layer cannot have a negative size, though it can be larger than the canvas.`;
+		ops.push({
+			path: layerPosition(t, buffer, layer, "sizeH"),
+			value: h,
+			describe: `Width ${h}px`
+		}, {
+			path: layerPosition(t, buffer, layer, "sizeV"),
+			value: v,
+			describe: `Height ${v}px`
+		});
+	}
+	if (set.position) {
+		const [hAmt, vAmt] = set.position.length === 1 ? [set.position[0], set.position[0]] : set.position;
+		const h = px(hAmt, "w", "Position");
+		if (typeof h === "string") return h;
+		const v = px(vAmt, "h", "Position");
+		if (typeof v === "string") return v;
+		for (const [axis, n] of [["X", h], ["Y", v]]) if (n < LAYER.positionMin || n > LAYER.positionMax) return `${axis} ${n}px is out of range — a position must be between ${LAYER.positionMin} and ${LAYER.positionMax}.`;
+		ops.push({
+			path: layerPosition(t, buffer, layer, "posH"),
+			value: h,
+			describe: `X ${h}px (layer centre)`
+		}, {
+			path: layerPosition(t, buffer, layer, "posV"),
+			value: v,
+			describe: `Y ${v}px (layer centre)`
+		});
+	}
+	if (set.opacity) {
+		const raw = set.opacity.percent ? Math.round(set.opacity.value / 100 * LAYER.opacityMax) : Math.round(set.opacity.value);
+		if (raw < 0 || raw > LAYER.opacityMax) return `Opacity ${raw} is out of range — the device's scale is 0 to ${LAYER.opacityMax}`;
+		ops.push({
+			path: layerOpacity(t, buffer, layer),
+			value: raw,
+			describe: `Opacity ${raw} of ${LAYER.opacityMax}`
+		});
+	}
+}
+/** An error is returned as a string prefixed with `!`, to keep one return type. */
+function sourceValue(src) {
+	switch (src.family) {
+		case "none": return "NONE";
+		case "colour": return "COLOR";
+		case "still": return src.n !== void 0 && src.n >= 1 && src.n <= SOURCES.still ? `STILL_${src.n}` : `!Still ${src.n} is out of range — stills are 1 to ${SOURCES.still}`;
+		case "live": return src.n !== void 0 && src.n >= 1 && src.n <= SOURCES.live ? `LIVE_${src.n}` : `!Source ${src.n} is out of range — live inputs are 1 to ${SOURCES.live}`;
+	}
+}
+function describeAssignment(set) {
+	const bits = [];
+	if (set.source) bits.push("source");
+	if (set.size) bits.push("size");
+	if (set.position) bits.push("position");
+	if (set.opacity) bits.push("opacity");
+	return bits.join(" + ");
 }
 var describeMode = (m) => m === "PREVIEW" ? "Preview" : "Program";
 var describeTarget = (t) => t.kind === "screen" ? `Screen ${t.n}` : `Aux ${t.n}`;

@@ -1,3 +1,9 @@
+# Vendored from stoatworks-backend/about/companion by scripts/sync-about.py.
+# Formatting the copy drifts it from the master and the next sync reverts it;
+# the master is the only place to change it.
+src/about-field.js
+src/about-field.d.ts
+
 # Generated, not written. Reformatting it makes `npm run sync:lang` produce a
 # spurious diff every time and defeats the point of vendoring a bundle.
 src/lang.js
@@ -5,3 +11,5 @@ src/lang.js
 node_modules
 pkg
 *.tgz
+dist
+.claude

@@ -101,5 +101,5 @@ export function keyTitle(command) {
   if (c.scope.layers?.numbers.values.length)
     bits.push(`L${c.scope.layers.numbers.values.join(".")}`);
   if (c.memory !== undefined) bits.push(`M${c.memory}`);
-  return bits.join("\\n");
+  return bits.join("\n");
 }

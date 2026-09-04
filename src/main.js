@@ -6,6 +6,8 @@ import UpdateFeedbacks from "./feedbacks.js";
 import UpdateVariableDefinitions, { refreshVariables } from "./variables.js";
 import UpdatePresets from "./presets.js";
 import { api } from "./api.js";
+import { Builder } from "./builder.js";
+import { readMacros, macroLabels } from "./macros.js";
 import { VERIFIED_FIRMWARE } from "./lang.js";
 import { aboutField } from "./about-field.js";
 
@@ -30,10 +32,18 @@ export default class ModuleInstance extends InstanceBase {
       lastSummary: "",
       lastError: "",
     };
+
+    // The builder holds the half-built command. It is per-connection, not per
+    // surface: the action event does carry a `surfaceId`, but variables and
+    // feedbacks belong to the connection, so two decks on the same page would
+    // show the same faces anyway. See docs/BUILDER.md.
+    this.builder = new Builder(12);
+    this.macros = readMacros("");
   }
 
   async init(config) {
     this.config = config;
+    this.loadBuilderConfig();
     this.onStateChanged = () => {
       refreshVariables(this);
       // A bare checkFeedbacks() checks NOTHING — it forwards [undefined] as a
@@ -51,9 +61,23 @@ export default class ModuleInstance extends InstanceBase {
 
   async configUpdated(config) {
     this.config = config;
+    this.loadBuilderConfig();
     api.close();
     this.rebuild();
     api.connect(this);
+  }
+
+  /**
+   * Re-read the two builder settings.
+   *
+   * The slot count cannot be worked out from the surface — a module is never
+   * told how big a Stream Deck is — so it is a config field, and the builder
+   * has to be told again whenever the config changes.
+   */
+  loadBuilderConfig() {
+    this.builder = new Builder(this.config?.builderSlots ?? 12);
+    this.macros = readMacros(this.config?.macros);
+    this.builder.macroLabels = macroLabels(this.macros);
   }
 
   rebuild() {
@@ -97,6 +121,34 @@ export default class ModuleInstance extends InstanceBase {
         width: 12,
         label: "Firmware",
         value: `Paths were verified against firmware <b>${VERIFIED_FIRMWARE}</b> on a physical Aquilon C. Analog Way has moved control paths between firmware versions before, so a much older or newer device may not respond to everything here.`,
+      },
+      {
+        type: "number",
+        id: "builderSlots",
+        label: "Command builder — slot keys",
+        width: 4,
+        default: 12,
+        min: 4,
+        max: 32,
+        tooltip:
+          "How many keys on your page are builder slots. A module is never told how big a surface is, so it has to be told here. Twelve puts the whole keypad except Thru/+/- on one page.",
+      },
+      {
+        type: "static-text",
+        id: "builder_info",
+        width: 8,
+        label: "Command builder",
+        value:
+          "Drag the <b>Command builder</b> presets onto a page: the slot keys, then Back, Home, More, Fire and Save. The slots relabel themselves as you press — a module cannot make a surface change page, so the page stays put and the faces change.",
+      },
+      {
+        type: "textinput",
+        id: "macros",
+        label: "Saved macros (JSON)",
+        width: 12,
+        default: "",
+        tooltip:
+          "Written by the builder's Save key. Hand-editable on purpose: this is what makes a macro set readable and shareable. A malformed value costs the macros, not the connection.",
       },
       aboutField(),
     ];

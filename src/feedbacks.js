@@ -1,5 +1,24 @@
 import { combineRgb } from "@companion-module/base";
 
+import { MACRO_SLOTS } from "./macros.js";
+
+/**
+ * What kind of thing a builder slot is showing.
+ *
+ * A boolean feedback can only be on or off, so a slot key carries one entry
+ * per kind and each paints its own colour. That is how a key that is a digit
+ * one moment and a Delete the next can look like both.
+ */
+const SLOT_KINDS = [
+  { id: "choice", label: "A word of the command" },
+  { id: "digit", label: "A keypad digit" },
+  { id: "operator", label: "Thru, +, -, backspace or the keypad key" },
+  { id: "action", label: "Fire, enter or another action" },
+  { id: "danger", label: "Something that overwrites or deletes" },
+  { id: "macro", label: "A saved macro" },
+  { id: "empty", label: "Nothing — the slot is blank" },
+];
+
 /**
  * Feedbacks.
  *
@@ -81,6 +100,86 @@ export default function UpdateFeedbacks(self) {
         (self.state.vendorSelection ?? []).includes(
           `S${feedback.options.screen}`,
         ),
+    },
+
+    // --- the command builder ------------------------------------------------
+
+    builder_slot_kind: {
+      name: "Builder: what a slot is showing",
+      description:
+        "Lit when the slot currently holds this kind of thing. The slot presets ship with one of these per kind, so an empty slot goes dark and a Delete goes red without the operator configuring anything.",
+      type: "boolean",
+      defaultStyle: {
+        bgcolor: combineRgb(40, 50, 65),
+        color: combineRgb(255, 255, 255),
+      },
+      options: [
+        {
+          type: "number",
+          id: "slot",
+          label: "Slot",
+          default: 1,
+          min: 1,
+          max: 32,
+        },
+        {
+          type: "dropdown",
+          id: "kind",
+          label: "Showing",
+          default: "empty",
+          choices: SLOT_KINDS.map((k) => ({ id: k.id, label: k.label })),
+        },
+      ],
+      callback: (feedback) => {
+        const slot = Number(feedback.options.slot) || 1;
+        const view = self.builder.view();
+        return (view[slot - 1]?.kind ?? "empty") === feedback.options.kind;
+      },
+    },
+
+    builder_ready: {
+      name: "Builder: the line would fire",
+      description:
+        "Lit whenever what has been built so far compiles. That is usually before the builder has finished asking — the grammar takes its clauses in any order, so Take Screen 1 is complete the moment the screen is chosen.",
+      type: "boolean",
+      defaultStyle: {
+        bgcolor: combineRgb(45, 140, 75),
+        color: combineRgb(255, 255, 255),
+      },
+      options: [],
+      callback: () => self.builder.valid,
+    },
+
+    builder_has_more: {
+      name: "Builder: the list has more pages",
+      type: "boolean",
+      defaultStyle: {
+        bgcolor: combineRgb(180, 130, 40),
+        color: combineRgb(0, 0, 0),
+      },
+      options: [],
+      callback: () => self.builder.pageCount() > 1,
+    },
+
+    macro_present: {
+      name: "Macro: the slot holds a command",
+      type: "boolean",
+      defaultStyle: {
+        bgcolor: combineRgb(90, 60, 130),
+        color: combineRgb(255, 255, 255),
+      },
+      options: [
+        {
+          type: "number",
+          id: "slot",
+          label: "Macro slot",
+          default: 1,
+          min: 1,
+          max: MACRO_SLOTS,
+        },
+      ],
+      callback: (feedback) =>
+        Boolean(self.macros?.[(Number(feedback.options.slot) || 1) - 1]),
     },
   });
 }
