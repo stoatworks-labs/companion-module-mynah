@@ -148,12 +148,22 @@ as a failing test rather than as a switcher doing the wrong thing.
 
 ## Status
 
-**v1.0.0.** The command planner is the same code verified against a physical
-Aquilon C on firmware 6.2.73, and the module surface is exercised against the
-real `@companion-module/base`.
+**v1.1.0 — field testing.** Driven end to end inside **Companion 5.0.1** against the
+AW LivePremier Simulator: the module loads and initialises cleanly, its ~100 presets
+populate, buttons were pressed on a real grid, the slot keys relabel themselves at
+every step, and the simulator's own socket showed the golden paths arriving — a preset
+recall onto preview and an `xTake` — built by pressing keys. The module surface is
+exercised against the real `@companion-module/base`.
 
-**Not yet run inside Companion, and not against a Stream Deck.** The preset
-structure, feedbacks and variables are checked against the library's actual
-types and runtime behaviour, but no button has been pressed on real hardware.
+**The command planner is verified against real hardware.** It is the same code as
+[mynah](https://github.com/stoatworks-labs/mynah)'s, and on 2026-09-09 every path that
+grammar emits was issued at a physical **Aquilon C** on firmware 6.2.73 and answered —
+the memory paths, and the audio matrix, with no `E12`. So the commands this module
+builds are known to be ones a real device accepts.
+
+**No button has been pressed against a real device, and not against a physical Stream
+Deck.** Everything above ran either in Companion against a simulator, or at hardware
+through a separate test harness. Those two halves have never been joined, and that
+join is the next thing to try.
 
 Not affiliated with Analog Way or with Bitfocus.
