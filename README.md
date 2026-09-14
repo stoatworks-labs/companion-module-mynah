@@ -62,7 +62,7 @@ The preset library is the point. Drag from Companion's preset panel:
 | Macros          | Twenty-four slots for commands the builder has parked       |
 | Status          | Connection, and the last command's result                   |
 
-That is a bit over a hundred ready-made buttons — enough to fill pages without
+That is 186 ready-made buttons — enough to fill pages without
 typing a command by hand. For anything past those ranges, drop a **Command**
 button on a key and type it.
 
@@ -149,7 +149,7 @@ as a failing test rather than as a switcher doing the wrong thing.
 ## Status
 
 **v1.1.0 — field testing.** Driven end to end inside **Companion 5.0.1** against the
-AW LivePremier Simulator: the module loads and initialises cleanly, its ~100 presets
+AW LivePremier Simulator: the module loads and initialises cleanly, its 186 presets
 populate, buttons were pressed on a real grid, the slot keys relabel themselves at
 every step, and the simulator's own socket showed the golden paths arriving — a preset
 recall onto preview and an `xTake` — built by pressing keys. The module surface is
