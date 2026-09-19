@@ -23,12 +23,12 @@ people who would rather pick from dropdowns.
 
 ## Download
 
-**[v1.1.0](https://github.com/stoatworks-labs/companion-module-mynah/releases/tag/v1.1.0)**
+**[v1.1.1](https://github.com/stoatworks-labs/companion-module-mynah/releases/tag/v1.1.1)**
 
 This release contains:
 
 - [`companion-module-mynah-pkg.tgz`](https://github.com/stoatworks-labs/companion-module-mynah/releases/latest/download/companion-module-mynah-pkg.tgz) — npm package, 36 KB
-- [`mynah-1.1.0.tgz`](https://github.com/stoatworks-labs/companion-module-mynah/releases/download/v1.1.0/mynah-1.1.0.tgz) — npm package, 36 KB
+- [`mynah-1.1.1.tgz`](https://github.com/stoatworks-labs/companion-module-mynah/releases/download/v1.1.1/mynah-1.1.1.tgz) — npm package, 36 KB
 
 All builds, checksums and release notes: [github.com/stoatworks-labs/companion-module-mynah/releases](https://github.com/stoatworks-labs/companion-module-mynah/releases).
 
