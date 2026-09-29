@@ -1,4 +1,5 @@
-> **AI-assisted project.** This codebase was created with [Claude Code](https://claude.com/claude-code).
+> **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
+> (Anthropic), directed and reviewed by a human author.
 > The command planner is the same code verified against a physical **Aquilon C** on firmware
 > 6.2.73, and the module surface is exercised against the real `@companion-module/base`. But
 > **this module has never been loaded into a running Companion**, and no button on a Stream Deck
