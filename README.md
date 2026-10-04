@@ -1,9 +1,10 @@
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
 > (Anthropic), directed and reviewed by a human author.
 > The command planner is the same code verified against a physical **Aquilon C** on firmware
-> 6.2.73, and the module surface is exercised against the real `@companion-module/base`. But
-> **this module has never been loaded into a running Companion**, and no button on a Stream Deck
-> has ever been pressed to fire one of its presets. See [Status](#status).
+> 6.2.73, and the module surface is exercised against the real `@companion-module/base`. It has
+> been driven end to end in **Companion 5.0.1**, but only against the AW LivePremier Simulator:
+> **no button has been pressed against a real device**, and none on a physical Stream Deck. See
+> [Status](#status).
 
 # companion-module-mynah
 
@@ -149,10 +150,13 @@ as a failing test rather than as a switcher doing the wrong thing.
 
 ## Status
 
-**v1.1.0 — field testing.** Driven end to end inside **Companion 5.0.1** against the
-AW LivePremier Simulator: the module loads and initialises cleanly, its 186 presets
-populate, buttons were pressed on a real grid, the slot keys relabel themselves at
-every step, and the simulator's own socket showed the golden paths arriving — a preset
+**v1.1.1 — field testing.** v1.1.1 fixes the module crashing on load when installed from
+the release package: the About block read `package.json` from a path that only exists in
+a checkout. The v1.1.0 code was driven end to end inside **Companion 5.0.1**, loaded
+from a checkout on the developer modules path, against the AW LivePremier Simulator:
+the module loads and initialises cleanly, its 186 presets populate, buttons were
+pressed on a real grid, the slot keys relabel themselves at every step, and the
+simulator's own socket showed the golden paths arriving — a preset
 recall onto preview and an `xTake` — built by pressing keys. The module surface is
 exercised against the real `@companion-module/base`.
 

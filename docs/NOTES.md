@@ -10,7 +10,7 @@ Cross-cutting notes that are not specific to this repo live in
 *companion-module-mynah — Bitfocus Companion module driving LivePremier with Mynah command syntax; v1.1.0 adds an on-surface COMMAND BUILDER, verified end-to-end in Companion 5.0.1 against the AW simulator; PUBLIC repo, no button pressed against real hardware*
 
 `~/projects/companion/companion-module-mynah`, **PUBLIC** on GitHub
-(`stoatworks-labs/companion-module-mynah`), branch `main`, **v1.1.0**, MIT.
+(`stoatworks-labs/companion-module-mynah`), branch `main`, **v1.1.1**, MIT.
 Built 2026-08-21 as the Stream Deck answer for [mynah](https://github.com/stoatworks-labs/mynah/blob/main/docs/NOTES.md) (`mynah`).
 
 **Companion, not Elgato.** Companion claims the Stream Deck itself, so the two
@@ -170,3 +170,8 @@ Buttons wired by hand, pressed via `POST /api/location/...`:
   `"macros": "[null,{\"line\":\"Take Screen 1\",\"label\":\"Take\\nS1\"}]"`.
 
 **Still not done: no button pressed against real hardware.**
+
+*2026-10-04:* v1.1.1 (2026-09-19) fixed the module crashing on load when installed
+from the release package — the About block read `package.json` from a path that
+only exists in a checkout. Every Companion run above loaded a checkout from the
+developer modules path, which is why none of them caught it.
