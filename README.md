@@ -150,8 +150,8 @@ as a failing test rather than as a switcher doing the wrong thing.
 
 ## Status
 
-**v1.1.1 — field testing.** v1.1.1 fixes the module crashing on load when installed from
-the release package: the About block read `package.json` from a path that only exists in
+**v1.1.2 — field testing.** v1.1.2 is a dependency release (`ws` 8.22.0). v1.1.1 fixed the
+module crashing on load when installed from the release package: the About block read `package.json` from a path that only exists in
 a checkout. The v1.1.0 code was driven end to end inside **Companion 5.0.1**, loaded
 from a checkout on the developer modules path, against the AW LivePremier Simulator:
 the module loads and initialises cleanly, its 186 presets populate, buttons were
