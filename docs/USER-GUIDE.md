@@ -70,8 +70,8 @@ screen by accident because you left a word off.
 
 Screens are 1–24, auxes 1–96, layers 1–128 plus `Native`.
 
-**Anything outside those is refused rather than clamped, and the refusal is logged.** A clamp would
-put memory 1000 on screen when you meant 10000 and typed a digit too many.
+**Anything outside those is refused rather than clamped, and the refusal is logged.** Type screen
+memory 5000 when you meant 500, one digit too many, and a clamp would recall memory 1000 instead.
 
 ---
 
