@@ -1,16 +1,16 @@
 # Companion — Mynah user guide
 
 This module drives an **Analog Way LivePremier (Aquilon)** with lighting-desk command syntax, from
-a Stream Deck or any other Bitfocus Companion surface. Two ways in: type a command, or **build one
-out of key presses**.
+a Stream Deck or any other Bitfocus Companion surface. You can type a command, or **build one out
+of key presses**.
 
-The [README](../README.md) covers installing the module. This is how to use both, and what the
-grammar will and will not accept.
+The [README](../README.md) covers installing the module. This guide covers both ways in, and what
+the grammar will and won't accept.
 
-> **Before you rely on this:** the module has been driven end to end in Companion 5.0.1. The
-> socket it uses is the **same Web RCS WebSocket that Analog Way's own browser UI uses**, and it
-> is **unauthenticated** — keep it on a trusted network, because anything that can reach it can
-> put something on air.
+> **Before you rely on this:** I've driven the module end to end in Companion 5.0.1. The socket it
+> uses is the **same Web RCS WebSocket that Analog Way's own browser UI uses**, and it's
+> **unauthenticated**, so keep it on a network you trust: anything that can reach it can put
+> something on air.
 >
 > This module was built with AI assistance, directed and reviewed by a human author.
 
@@ -19,7 +19,7 @@ grammar will and will not accept.
 ## Connecting
 
 Device address and port. **80** for a switcher, **3000** for the LivePremier simulator. The module
-reconnects on its own if the link drops.
+reconnects by itself if the link drops.
 
 ---
 
@@ -42,20 +42,21 @@ Verb first, then what it acts on:
 
 Ranges use `Thru`, `+` and `-`, so `Screen 1 Thru 8 - 5` is every screen from 1 to 8 except 5.
 
-**Keywords may be shortened to any unambiguous prefix**, so `R Sc 1 Th 4 Me 7` is the same command
-as the long form — which matters when you are typing into a button field rather than a console.
+**You can shorten any keyword to a prefix, as long as it isn't ambiguous**, so `R Sc 1 Th 4 Me 7`
+is the same command as the long form. That helps a lot when you're typing into a button field
+rather than on a console.
 
-The field supports Companion variables, so a command can be assembled at press time.
+The field takes Companion variables, so a command can be put together at the moment it's pressed.
 
 ---
 
 ## The two defaults that decide what reaches air
 
-**An unqualified `Recall` goes to Preview. An unqualified `Store` takes from Program** — which is
-the device's own default, not an invention here.
+**A `Recall` on its own goes to Preview. A `Store` on its own takes from Program.** That's the
+device's own default, not something I made up.
 
-So **getting to air always takes an explicit `Program` or a `Take`.** There is no command that
-puts something on screen by accident because you left a word off.
+So **getting to air always takes an explicit `Program` or a `Take`.** No command puts something on
+screen by accident because you left a word off.
 
 ---
 
@@ -69,18 +70,18 @@ puts something on screen by accident because you left a word off.
 
 Screens are 1–24, auxes 1–96, layers 1–128 plus `Native`.
 
-**Anything outside is refused rather than clamped, and the refusal is logged.** A clamp would put
-memory 1000 on screen when you meant 10000 and typed a digit too many.
+**Anything outside those is refused rather than clamped, and the refusal is logged.** A clamp would
+put memory 1000 on screen when you meant 10000 and typed a digit too many.
 
 ---
 
 ## Every command names its own scope
 
-Unlike the Mynah web tool, **a button has no sticky selection.** Every command must name its
-screen, and `Select` and `Clear` are refused for that reason.
+Unlike the Mynah web tool, **a button has no sticky selection.** Every command has to name its
+screen, and that's why `Select` and `Clear` are refused.
 
-This is the right trade for a surface: a button whose meaning depends on which button was pressed
-before it is a button that does the wrong thing after someone else walks past the desk.
+It's the right trade for a surface. A button whose meaning depends on which button was pressed
+before it will do the wrong thing the first time someone else wanders past the desk.
 
 ---
 
@@ -90,49 +91,50 @@ Build a command out of key presses instead of typing one.
 
 Drag the **Command builder** presets onto a page: the numbered slot keys in order, then **Back**,
 **Home**, **More**, **Fire** and **Save**. Then **tell the connection how many slot keys you laid
-out** — a Companion module is never told how big a surface is, so it cannot work this out.
+out**. A Companion module never gets told how big a surface is, so it can't work this out for
+itself.
 
 Press a slot and the faces change to the next set of choices: the verbs, then what to act on, then
-a list of screens, with a `123…` key to a keypad for anything longer or for a range.
+a list of screens, with a `123…` key that takes you to a keypad for anything longer or for a range.
 
-**The page never changes; the keys relabel themselves.** That is deliberate — a module cannot
-change Companion's page, so the builder changes the *faces* instead. The upshot is that your
-muscle memory for where Fire is stays true all the way through.
+**The page never changes; the keys relabel themselves.** A module can't change Companion's page, so
+the builder changes the *faces* instead. The upside is that your muscle memory for where Fire lives
+stays right all the way through.
 
-**Fire lights as soon as what you have built compiles**, which is often before the last question
-is answered: `Take Screen 1` is finished the moment the screen lands, and the offer of Preview or
+**Fire lights as soon as what you've built compiles**, which is often before the last question's
+been answered: `Take Screen 1` is finished the moment the screen lands, and the offer of Preview or
 Program is only an offer.
 
-The keypad carries `Thru`, `+` and `-` **wherever the grammar takes a range, and hides them where
-it does not**. **Back** is an undo, one press at a time.
+The keypad has `Thru`, `+` and `-` **wherever the grammar takes a range, and hides them where it
+doesn't**. **Back** is an undo, one press at a time.
 
 **Save** parks the line on one of twenty-four macro slots. Macros live in the connection's own
-config, so they survive a restart and travel with a Companion configuration export; each macro key
-labels itself.
+config, so they survive a restart and go along with a Companion configuration export, and each
+macro key labels itself.
 
 ### What the builder deliberately leaves out
 
 `Set` and `Label`.
 
-**`Label` needs a quoted string**, and a control surface has no text entry. **`Set` — live layer
-control — needs the device's current buffer state**, which this module does not track, so the
-compiler would refuse every one it produced. Offering either would be offering a key that cannot
-work.
+**`Label` needs a quoted string**, and a control surface has no way to type one. **`Set` (live
+layer control) needs the device's current buffer state**, which this module doesn't track, so the
+compiler would refuse every one the builder made. Offering either would mean offering a key that
+can't work.
 
-Both are still available from the typed Command action.
+You can still use both from the typed Command action.
 
 ---
 
 ## Feedbacks
 
-- **Memory is loaded on a screen** — the memory sits in one of that screen's preset buffers. It
-  **does not distinguish preview from program**: the device reports buffers as A/B/C, and which
-  one is preview differs between screens. Read it as "this memory is in play here".
+- **Memory is loaded on a screen:** the memory sits in one of that screen's preset buffers. It
+  **doesn't tell preview from program**: the device reports buffers as A/B/C, and which one is
+  preview differs between screens. Read it as "this memory is in play here".
 - **Connected to the device**
-- **Screen is selected in the vendor Web RCS** — what the browser UI has selected, which is useful
+- **Screen is selected in the vendor Web RCS:** what the browser UI has selected, which is handy
   when someone else is driving it.
-- **Builder: what a slot is showing** — colours a slot key by what it holds, so an empty slot goes
-  dark and a Delete goes red with nothing to configure.
+- **Builder: what a slot is showing:** colours a slot key by what it holds, so an empty slot goes
+  dark and a Delete goes red, with nothing for you to set up.
 - **Builder: the line would fire**
 - **Builder: the list has more pages**
 - **Macro: the slot holds a command**
@@ -154,5 +156,5 @@ Both are still available from the typed Command action.
 
 ## See also
 
-- [README](../README.md) — installing, and the full action/feedback/variable list
-- [`companion/HELP.md`](../companion/HELP.md) — the same material, in Companion's help panel
+- [README](../README.md): installing, and the full list of actions, feedbacks and variables
+- [`companion/HELP.md`](../companion/HELP.md): the same material, in Companion's help panel
