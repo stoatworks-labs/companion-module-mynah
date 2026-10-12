@@ -131,7 +131,7 @@ Or run `npm run package` and install the `.tgz` it makes.
 
 ```bash
 npm install
-npm test      # 32 checks, no network
+npm test      # 56 checks, no network
 npm run package
 ```
 
@@ -139,7 +139,9 @@ npm run package
 
 `src/lang.js` is generated, not written by hand. It's the Mynah language core,
 bundled from its TypeScript source, so a command means the same thing here as it
-does in the web tool. To update it:
+does in the web tool. The copy here was last re-synced on 2026-09-04, and mynah's
+grammar has moved on since (Midra 4K / Alta 4K, `$` and `@` variables, and the
+save-mode fix in [Status](#status)). To update it:
 
 ```bash
 npm run build:lang     # in the mynah repo
@@ -161,11 +163,16 @@ simulator's own socket showed the golden paths arriving (a preset recall onto pr
 `xTake`), built by pressing keys. The module surface is exercised against the real
 `@companion-module/base`.
 
-**The command planner is verified against real hardware.** It's the same code as
+**The command planner is verified against real hardware.** It's a copy of
 [mynah](https://github.com/stoatworks-labs/mynah)'s, and on 2026-09-09 every path that
 grammar emits was sent to a physical Aquilon C on firmware 6.2.73 and got an answer, the
 memory paths and the audio matrix included, with no `E12`. So the commands this module builds
-are ones a real device is known to accept.
+are ones a real device is known to accept, bar one. On 2026-09-12 mynah found that its master
+store from preview sent the save mode as `SAVE_FROM_PVW`, where the device wants
+`SAVE_FROM_PRW`, and that the wrong spelling is ignored without an error, so the store came
+from program instead. Mynah fixed it in v1.4.0. This module's copy was last re-synced before
+that, so a `Store Master … Preview` from here still stores from program until `src/lang.js` is
+re-synced.
 
 **No button has been pressed against a real device, or on a physical Stream Deck.**
 Everything above ran either in Companion against a simulator, or at hardware through a

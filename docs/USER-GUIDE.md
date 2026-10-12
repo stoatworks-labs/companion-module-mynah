@@ -156,5 +156,5 @@ You can still use both from the typed Command action.
 
 ## See also
 
-- [README](../README.md): installing, and the full list of actions, feedbacks and variables
+- [README](../README.md): installing, the preset sections, and what's been tested
 - [`companion/HELP.md`](../companion/HELP.md): the same material, in Companion's help panel
