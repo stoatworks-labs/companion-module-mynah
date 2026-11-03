@@ -15,6 +15,8 @@ Store Master 12 If Screen 1 + 3 Category Source + Position
 Take Screen 1 Thru 4
 ```
 
+The [project page](https://stoatworks-labs.com/software/companion-mynah/) has the downloads and the [user guide](https://stoatworks-labs.com/software/companion-mynah/guide/).
+
 One action takes any Mynah command, so a button says what it does in words
 instead of hiding it behind a numeric opcode. There are separate actions too, if
 you'd rather pick from dropdowns.
