@@ -1,4 +1,4 @@
-import { InstanceBase, InstanceStatus, Regex } from "@companion-module/base";
+import { InstanceBase, InstanceStatus } from "@companion-module/base";
 
 import { UpgradeScripts } from "./upgrades.js";
 import UpdateActions from "./actions.js";
@@ -98,13 +98,17 @@ export default class ModuleInstance extends InstanceBase {
         value:
           "Point this at an Analog Way LivePremier (Aquilon). It speaks the same <b>Web RCS WebSocket</b> the vendor's own browser UI uses, on port 80 of a device or 3000 of the simulator — so it needs nothing installed on the switcher, and it sees changes a human makes in the Web RCS. The socket is <b>unauthenticated</b>: anyone who can reach the port can drive the switcher, so keep it on a trusted network.",
       },
+      // A plain text field rather than Regex.HOSTNAME, which base 2.2.2
+      // deprecated. The port has always been a number field, so no saved
+      // config needs upgrading.
       {
         type: "textinput",
         id: "host",
         label: "Device address",
+        tooltip: "IP address (IPv4 or IPv6) or hostname",
         width: 8,
+        minLength: 1,
         default: "",
-        regex: Regex.HOSTNAME,
       },
       {
         type: "number",
@@ -114,6 +118,7 @@ export default class ModuleInstance extends InstanceBase {
         default: 80,
         min: 1,
         max: 65535,
+        asInteger: true,
       },
       {
         type: "static-text",

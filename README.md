@@ -133,7 +133,7 @@ Or run `npm run package` and install the `.tgz` it makes.
 
 ```bash
 npm install
-npm test      # 56 checks, no network
+npm test      # 59 checks, no network
 npm run package
 ```
 

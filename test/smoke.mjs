@@ -507,6 +507,46 @@ check("no parseVariablesInString/Field call survives in src/", () => {
   );
 });
 
+// @companion-module/base 2.2.2 turned Regex into a proxy that logs a
+// deprecation warning for IP, HOSTNAME, PORT and the rest. The device address
+// is a plain text field now, so it can be an IPv6 address, which needs its
+// brackets in the WebSocket URL. The port was always a number field.
+const { wsUrl } = await import("../src/api.js");
+
+check("config fields: plain host text, number port, no regex", () => {
+  const fields = ModuleInstance.prototype.getConfigFields.call({});
+  const byId = Object.fromEntries(fields.map((f) => [f.id, f]));
+  assert.equal(byId.host.type, "textinput");
+  assert.equal(byId.host.minLength, 1);
+  assert.equal(byId.port.type, "number");
+  assert.ok(Number.isInteger(byId.port.default), "port default is a number");
+  assert.deepEqual(
+    fields.filter((f) => "regex" in f).map((f) => f.id),
+    [],
+  );
+});
+
+// It matches the import, so comments naming the old constants stay legal.
+check("no file in src/ imports Regex", () => {
+  const dir = new URL("../src/", import.meta.url).pathname;
+  const offenders = pvReadDir(dir).filter(
+    (f) =>
+      /\.(js|ts)$/.test(f) &&
+      /import\s*{[^}]*\bRegex\b[^}]*}\s*from\s*["']@companion-module\/base/.test(
+        pvReadFile(dir + f, "utf8"),
+      ),
+  );
+  assert.deepEqual(offenders, [], "use a number or plain textinput field");
+});
+
+check("an IPv6 address gets its brackets in the WebSocket URL", () => {
+  assert.equal(wsUrl("192.168.2.140", 80), "ws://192.168.2.140:80/");
+  assert.equal(wsUrl("aquilon.local", 3000), "ws://aquilon.local:3000/");
+  assert.equal(wsUrl("::1", 3000), "ws://[::1]:3000/");
+  assert.equal(wsUrl("[fd00::5]", 80), "ws://[fd00::5]:80/");
+  assert.equal(new URL(wsUrl("fd00::5", 80)).hostname, "[fd00::5]");
+});
+
 // ---------------------------------------------------------------------------
 // The command builder
 // ---------------------------------------------------------------------------

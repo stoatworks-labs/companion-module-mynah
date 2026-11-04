@@ -25,7 +25,7 @@ src/actions.js   The Command action plus discrete ones. All funnel through run()
 src/presets.js   The preset library — this is what populates a Stream Deck.
 src/feedbacks.js What can honestly be shown, which is less than it looks.
 src/variables.js Definitions are an OBJECT keyed by id.
-test/smoke.mjs   56 checks. No network, no test runner.
+test/smoke.mjs   59 checks. No network, no test runner.
 docs/BUILDER.md  Why the builder is not a page-per-step wizard, and what is
                  deliberately left out of it.
 ```

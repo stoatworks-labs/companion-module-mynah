@@ -53,7 +53,7 @@ class Api {
       return;
     }
     const port = Number(self.config?.port) || 80;
-    const url = `ws://${host}:${port}/`;
+    const url = wsUrl(host, port);
 
     self.updateStatus(InstanceStatus.Connecting);
 
@@ -261,6 +261,14 @@ class Api {
     }
     this.ws = undefined;
   }
+}
+
+// The host field takes any text, so an IPv6 address needs its brackets added
+// before it can sit in a URL.
+export function wsUrl(host, port) {
+  const bracketed =
+    host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+  return `ws://${bracketed}:${port}/`;
 }
 
 export const api = new Api();
